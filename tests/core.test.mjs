@@ -154,6 +154,18 @@ test('multi-range plan: never worse than any single range, matches brute force o
   }
 });
 
+test('blackouts: no planned booking window overlaps a closed period', () => {
+  const rnd = C.mulberry32(23);
+  for (let t = 0; t < 30; t++) {
+    const cost = Array.from({ length: 365 }, () => 8 + Math.floor(rnd() * 20));
+    const a = 30 + Math.floor(rnd() * 250), bl = [[a, a + 10 + Math.floor(rnd() * 40)]];
+    const masked = C.applyBlackouts(cost, bl);
+    const p = C.planYear(masked, 3, 40);
+    for (const d of p.days) assert.ok(d + cost[d - 1] - 1 < bl[0][0] || d > bl[0][1]);
+    assert.equal(masked[bl[0][0] - 1], Infinity);
+  }
+});
+
 test('probWithin: point estimate is the replay fraction and the bootstrap interval contains it', () => {
   const L = C.launchableDays(andoya, C.DEFAULT_LCC);
   const reps = C.startReplays(andoya, L, 2, 15, C.DEFAULT_SPEC, { years: YEARS, jitter: 7 });

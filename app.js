@@ -484,7 +484,7 @@ async function rangesRender(seq) {
 function planYearValue() { return +(localStorage.getItem(STORE + '/year') || 2027); }
 function saveSchedule() { try { localStorage.setItem(STORE, JSON.stringify(schedule)); } catch { toast('Could not save to this browser'); } }
 function loadSchedule() { try { const v = JSON.parse(localStorage.getItem(STORE) || '[]'); return Array.isArray(v) ? v.filter((x) => x && x.site && x.start) : []; } catch { return []; } }
-let planUI = { K: 4, gap: 60, earliest: '01-15', latest: '12-15', ranges: null, result: null };
+let planUI = { K: 4, gap: 60, earliest: '01-15', latest: '12-15', ranges: null, blackouts: '', result: null };
 
 function scheduleView(site) {
   const yr = planYearValue();
@@ -505,10 +505,11 @@ function scheduleView(site) {
       <div class="field"><label for="pL">Latest arrival</label><input class="input" id="pL" value="${fmtMD(...parseStart(planUI.latest))}"></div>
       <button class="btn" id="optimise">Optimise</button>
     </div>
+    <div class="field" style="margin-top:12px"><label for="pB">Range closed</label><input class="input" id="pB" placeholder="e.g. Andøya 1 Mar - 31 Mar; Churchill 1 Nov - 31 Dec" value="${esc(planUI.blackouts)}"><div class="hint">Dates the range is booked by others. No proposed window will overlap them.</div></div>
     <div class="actions" style="margin-top:12px;flex-wrap:wrap" role="group" aria-label="Ranges the optimiser may use"><span style="font-weight:500;margin-right:4px">Ranges allowed</span>${META.sites.map((x) => `<label class="check" style="margin-right:10px"><input type="checkbox" data-range="${x.slug}" ${(planUI.ranges || [state.site]).includes(x.slug) ? 'checked' : ''}> ${esc(x.name)}</label>`).join('')}</div>
     ${pr ? `<table class="plan" style="margin-top:14px"><thead><tr><th>Plan</th>${pr.opt.days.map((_, i) => `<th>Campaign ${i + 1}</th>`).join('')}<th class="num">Range days booked</th></tr></thead><tbody>
       <tr class="sel"><td style="font-weight:500">Optimal${pr.multi ? '<div class="muted" style="font-weight:400;font-size:12px">exact DP, any allowed range</div>' : '<div class="muted" style="font-weight:400;font-size:12px">exact DP</div>'}</td>${pr.opt.days.map((dd, i) => { const [m, d] = C.monthDayOfDoy(dd); const nm = META.sites.find((x) => x.slug === pr.opt.ranges[i]).name; return `<td>${fmtMD(m, d)} · ${pr.costs[pr.opt.ranges[i]][dd - 1]} d${pr.multi ? `<div class="muted" style="font-size:12px">${esc(nm)}</div>` : ''}</td>`; }).join('')}<td class="num">${fmtDays(pr.opt.total)}</td></tr>
-      <tr><td style="font-weight:500">Evenly spaced<div class="muted" style="font-weight:400;font-size:12px">from earliest, ${esc(META.sites.find((x) => x.slug === pr.base).name)}</div></td>${pr.even.days.map((dd) => { if (dd > 365) return '<td class="muted">past year end</td>'; const [m, d] = C.monthDayOfDoy(dd); return `<td>${fmtMD(m, d)} · ${fmtDays(pr.costs[pr.base][dd - 1])} d</td>`; }).join('')}<td class="num">${fmtDays(pr.even.total)}</td></tr></tbody></table>
+      <tr><td style="font-weight:500">Evenly spaced<div class="muted" style="font-weight:400;font-size:12px">from earliest, ${esc(META.sites.find((x) => x.slug === pr.base).name)}</div></td>${pr.even.days.map((dd) => { if (dd > 365) return '<td class="muted">past year end</td>'; const [m, d] = C.monthDayOfDoy(dd); return `<td>${fmtMD(m, d)} · ${Number.isFinite(pr.costs[pr.base][dd - 1]) ? pr.costs[pr.base][dd - 1] + ' d' : '<span class="muted">closed or no finish</span>'}</td>`; }).join('')}<td class="num">${Number.isFinite(pr.even.total) ? pr.even.total : 'infeasible'}</td></tr></tbody></table>
       <div class="actions" style="margin-top:12px"><button class="btn" id="applyPlan" ${pr.opt.days.length ? '' : 'disabled'}>${ICON.plus}Apply optimal plan to schedule</button><span class="muted">${Number.isFinite(pr.even.total) && Number.isFinite(pr.opt.total) ? `Saves ${pr.even.total - pr.opt.total} range days (${pct((pr.even.total - pr.opt.total) / pr.even.total)}) at the same ${state.conf}% confidence per campaign.` : ''}</span></div>` : ''}`;
   return `
   <div class="section">
@@ -544,8 +545,11 @@ function bindSchedule(site) {
     $('optimise').disabled = true; $('optimise').textContent = 'Optimising…';
     let sitesL;
     try { sitesL = await Promise.all(ranges.map((r) => loadSite(r))); } catch (err) { toast('Could not load range data'); render(); return; }
+    const blackouts = parseBlackouts($('pB').value);
+    if (blackouts === null) { toast('Write closures like: Andøya 1 Mar - 31 Mar'); render(); return; }
+    planUI.blackouts = $('pB').value;
     const costs = {};
-    for (const st of sitesL) costs[st.slug] = curveOf(st, state).map((c) => c.book);
+    for (const st of sitesL) costs[st.slug] = C.applyBlackouts(curveOf(st, state).map((c) => c.book), blackouts.filter((b) => b.slug === st.slug).map((b) => [b.a, b.b]));
     const medians = {};
     for (const st of sitesL) medians[st.slug] = curveOf(st, state).map((c) => c.median);
     const base = ranges.includes(state.site) ? state.site : ranges[0];
@@ -560,6 +564,23 @@ function bindSchedule(site) {
     if (addToSchedule(site, picks)) render();
   });
 }
+/** "Andøya 1 Mar - 31 Mar; Churchill 1 Nov - 31 Dec" -> [{ slug, a, b }] (day-of-year); null if malformed. */
+function parseBlackouts(txt) {
+  const out = [];
+  for (const part of txt.split(/[;\n]+/).map((x) => x.trim()).filter(Boolean)) {
+    const r = part.match(/^(.+?)\s+(\d{1,2}\s+[A-Za-z]{3,})\s*(?:-|–|to)\s*(\d{1,2}\s+[A-Za-z]{3,})$/);
+    if (!r) return null;
+    const name = r[1].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const site = META.sites.find((x) => x.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').startsWith(name) || x.slug === name);
+    const s = parseStart(r[2]), e = parseStart(r[3]);
+    if (!site || !s || !e) return null;
+    const a = C.doyOf(...s), b = C.doyOf(...e);
+    if (b >= a) out.push({ slug: site.slug, a, b });
+    else out.push({ slug: site.slug, a, b: 365 }, { slug: site.slug, a: 1, b }); // wraps the new year
+  }
+  return out;
+}
+
 function scheduleRows() {
   return schedule.map((x) => { const [m, d] = parseStart(x.start); return { range: META.sites.find((s) => s.slug === x.site)?.name || x.site, arrive: fmtDate(x.year, m, d), booking_ends: fmtDate(x.year, m, d, x.book - 1), days: x.book, median_days: x.median, flights: x.flights, confidence: x.conf, status: x.status }; });
 }

@@ -355,6 +355,18 @@ export function planYearMulti(costs, K, minGap, earliest = 1, latest = 365) {
   return { days: p.days, ranges: p.days.map((d) => arg[d - 1]), total: p.total, envelope: env };
 }
 
+/**
+ * Apply range blackouts: a campaign arriving on day d occupies [d, d + cost[d] - 1]; if that
+ * window overlaps any blackout [a, b] (day-of-year, inclusive) the arrival is infeasible.
+ */
+export function applyBlackouts(cost, blackouts) {
+  return cost.map((c, i) => {
+    if (!Number.isFinite(c)) return c;
+    const s = i + 1, e = i + c;
+    return blackouts.some(([a, b]) => s <= b && e >= a) ? Infinity : c;
+  });
+}
+
 /** Baseline: K campaigns evenly spaced from `earliest`, one every `minGap` days. */
 export function evenPlan(cost, K, minGap, earliest = 1) {
   const days = [];

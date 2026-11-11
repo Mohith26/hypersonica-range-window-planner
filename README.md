@@ -42,7 +42,7 @@ All computation runs in the browser from `src/core.js`; the same module produces
 - **Planner** (main view): booking length, median finish, chance of finishing in a booking you type in, launchable-day rate, the booking curve across the year (click to move the date), and every past year as a day strip.
 - **Replay** (drill-down): every year by day on range; click a day for its hourly wind, gust, rain, low cloud and sun elevation with the failing limit highlighted. Local or UTC.
 - **Ranges:** five ranges by arrival month under the same campaign and criteria, with season-blind booking and held-out coverage; click a cell to plan it.
-- **Schedule:** add windows (`A`), move them through Proposed, Requested, Confirmed, optimise a year across one or more ranges (for example Andøya plus the two Canadian sites) and apply the plan. Saved in `localStorage`; export CSV or JSON.
+- **Schedule:** add windows (`A`), move them through Proposed, Requested, Confirmed, optimise a year across one or more ranges (for example Andøya plus the two Canadian sites), with dates each range is closed to you, and apply the plan. Saved in `localStorage`; export CSV or JSON.
 - **Method:** the derivation and a live backtest for the current settings.
 - Deep links (`#planner?site=churchill&start=06-10&flights=3`), keyboard shortcuts (`←/→`, `Shift+←/→`, `[`/`]`, `1-5`, `A`, `E`, `?`).
 
