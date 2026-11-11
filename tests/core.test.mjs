@@ -140,6 +140,20 @@ test('annual plan DP matches brute force and respects the minimum gap (randomize
   assert.equal(C.planYear(new Array(365).fill(1), 3, 200).total, Infinity);
 });
 
+test('multi-range plan: never worse than any single range, matches brute force over range choices', () => {
+  const rnd = C.mulberry32(17);
+  for (let t = 0; t < 40; t++) {
+    const costs = { a: [], b: [], c: [] };
+    for (const k of Object.keys(costs)) costs[k] = Array.from({ length: 365 }, () => 10 + Math.floor(rnd() * 30));
+    const K = 1 + Math.floor(rnd() * 3), gap = 30 + Math.floor(rnd() * 30), E = 1 + Math.floor(rnd() * 150), Lt = Math.min(365, E + 60 + Math.floor(rnd() * 80));
+    const multi = C.planYearMulti(costs, K, gap, E, Lt);
+    for (const k of Object.keys(costs)) assert.ok(multi.total <= C.planYear(costs[k], K, gap, E, Lt).total);
+    const env = Array.from({ length: 365 }, (_, i) => Math.min(costs.a[i], costs.b[i], costs.c[i]));
+    assert.equal(multi.total, C.bruteForcePlan(env, K, gap, E, Lt));
+    if (multi.total < Infinity) assert.equal(multi.days.reduce((acc, d, i) => acc + costs[multi.ranges[i]][d - 1], 0), multi.total);
+  }
+});
+
 test('probWithin: point estimate is the replay fraction and the bootstrap interval contains it', () => {
   const L = C.launchableDays(andoya, C.DEFAULT_LCC);
   const reps = C.startReplays(andoya, L, 2, 15, C.DEFAULT_SPEC, { years: YEARS, jitter: 7 });

@@ -331,15 +331,17 @@ function drawChart(site) {
 function addToSchedule(site, fromPlan = null) {
   const s = state;
   const curve = curveOf(site, s);
-  const items = (fromPlan || [doyOfStart(s)]).map((doy) => {
-    const c = curve[doy - 1];
-    return { id: Math.random().toString(36).slice(2, 9), site: s.site, start: mdKey(c.m, c.d), year: planYearValue(), flights: s.flights,
-      book: c.book, median: c.median, conf: s.conf, status: 'Proposed', created: new Date().toISOString(), params: { ...lccOf(s), ...specOf(s) } };
+  // fromPlan: [{ doy, slug, book, median }] (possibly different ranges) or null for the current window
+  const picks = fromPlan || [{ doy: doyOfStart(s), slug: s.site, book: curve[doyOfStart(s) - 1].book, median: curve[doyOfStart(s) - 1].median }];
+  const items = picks.map((p) => {
+    const [m, d] = C.monthDayOfDoy(p.doy);
+    return { id: Math.random().toString(36).slice(2, 9), site: p.slug, start: mdKey(m, d), year: planYearValue(), flights: s.flights,
+      book: p.book, median: p.median, conf: s.conf, status: 'Proposed', created: new Date().toISOString(), params: { ...lccOf(s), ...specOf(s) } };
   });
   if (items.some((i) => i.book === Infinity)) { toast('No finish within 120 days for that window; pick another date'); return false; }
   schedule = [...schedule, ...items].sort((a, b) => (a.year - b.year) || a.start.localeCompare(b.start));
   saveSchedule();
-  toast(items.length === 1 ? `Added ${META.sites.find((x) => x.slug === s.site).name}, ${fmtMD(...parseStart(items[0].start))} (${items[0].book} days)` : `Added ${items.length} windows to the schedule`);
+  toast(items.length === 1 ? `Added ${META.sites.find((x) => x.slug === items[0].site).name}, ${fmtMD(...parseStart(items[0].start))} (${items[0].book} days)` : `Added ${items.length} windows to the schedule`);
   $('schedCount').textContent = schedule.length;
   return true;
 }
@@ -482,7 +484,7 @@ async function rangesRender(seq) {
 function planYearValue() { return +(localStorage.getItem(STORE + '/year') || 2027); }
 function saveSchedule() { try { localStorage.setItem(STORE, JSON.stringify(schedule)); } catch { toast('Could not save to this browser'); } }
 function loadSchedule() { try { const v = JSON.parse(localStorage.getItem(STORE) || '[]'); return Array.isArray(v) ? v.filter((x) => x && x.site && x.start) : []; } catch { return []; } }
-let planUI = { K: 4, gap: 60, earliest: '01-15', latest: '12-15', result: null };
+let planUI = { K: 4, gap: 60, earliest: '01-15', latest: '12-15', ranges: null, result: null };
 
 function scheduleView(site) {
   const yr = planYearValue();
@@ -503,9 +505,10 @@ function scheduleView(site) {
       <div class="field"><label for="pL">Latest arrival</label><input class="input" id="pL" value="${fmtMD(...parseStart(planUI.latest))}"></div>
       <button class="btn" id="optimise">Optimise</button>
     </div>
-    ${pr ? `<table style="margin-top:14px"><thead><tr><th>Plan</th>${pr.opt.days.map((_, i) => `<th>Campaign ${i + 1}</th>`).join('')}<th class="num">Range days booked</th></tr></thead><tbody>
-      <tr class="sel"><td style="font-weight:500">Optimal (exact DP)</td>${pr.opt.days.map((dd) => { const [m, d] = C.monthDayOfDoy(dd); return `<td>${fmtMD(m, d)} · ${pr.cost[dd - 1]} d</td>`; }).join('')}<td class="num">${fmtDays(pr.opt.total)}</td></tr>
-      <tr><td style="font-weight:500">Evenly spaced from earliest</td>${pr.even.days.map((dd) => { if (dd > 365) return '<td class="muted">past year end</td>'; const [m, d] = C.monthDayOfDoy(dd); return `<td>${fmtMD(m, d)} · ${fmtDays(pr.cost[dd - 1])} d</td>`; }).join('')}<td class="num">${fmtDays(pr.even.total)}</td></tr></tbody></table>
+    <div class="actions" style="margin-top:12px;flex-wrap:wrap" role="group" aria-label="Ranges the optimiser may use"><span style="font-weight:500;margin-right:4px">Ranges allowed</span>${META.sites.map((x) => `<label class="check" style="margin-right:10px"><input type="checkbox" data-range="${x.slug}" ${(planUI.ranges || [state.site]).includes(x.slug) ? 'checked' : ''}> ${esc(x.name)}</label>`).join('')}</div>
+    ${pr ? `<table class="plan" style="margin-top:14px"><thead><tr><th>Plan</th>${pr.opt.days.map((_, i) => `<th>Campaign ${i + 1}</th>`).join('')}<th class="num">Range days booked</th></tr></thead><tbody>
+      <tr class="sel"><td style="font-weight:500">Optimal${pr.multi ? '<div class="muted" style="font-weight:400;font-size:12px">exact DP, any allowed range</div>' : '<div class="muted" style="font-weight:400;font-size:12px">exact DP</div>'}</td>${pr.opt.days.map((dd, i) => { const [m, d] = C.monthDayOfDoy(dd); const nm = META.sites.find((x) => x.slug === pr.opt.ranges[i]).name; return `<td>${fmtMD(m, d)} · ${pr.costs[pr.opt.ranges[i]][dd - 1]} d${pr.multi ? `<div class="muted" style="font-size:12px">${esc(nm)}</div>` : ''}</td>`; }).join('')}<td class="num">${fmtDays(pr.opt.total)}</td></tr>
+      <tr><td style="font-weight:500">Evenly spaced<div class="muted" style="font-weight:400;font-size:12px">from earliest, ${esc(META.sites.find((x) => x.slug === pr.base).name)}</div></td>${pr.even.days.map((dd) => { if (dd > 365) return '<td class="muted">past year end</td>'; const [m, d] = C.monthDayOfDoy(dd); return `<td>${fmtMD(m, d)} · ${fmtDays(pr.costs[pr.base][dd - 1])} d</td>`; }).join('')}<td class="num">${fmtDays(pr.even.total)}</td></tr></tbody></table>
       <div class="actions" style="margin-top:12px"><button class="btn" id="applyPlan" ${pr.opt.days.length ? '' : 'disabled'}>${ICON.plus}Apply optimal plan to schedule</button><span class="muted">${Number.isFinite(pr.even.total) && Number.isFinite(pr.opt.total) ? `Saves ${pr.even.total - pr.opt.total} range days (${pct((pr.even.total - pr.opt.total) / pr.even.total)}) at the same ${state.conf}% confidence per campaign.` : ''}</span></div>` : ''}`;
   return `
   <div class="section">
@@ -515,7 +518,7 @@ function scheduleView(site) {
     : `<div class="state"><div class="big">No range windows yet.</div><p class="muted" style="margin:0">Add one from the Planner (<kbd>A</kbd>) or let the optimiser below pick a year's arrivals.</p></div>`}
   </div>
   <div class="section">
-    <div class="section-head"><span>Optimise a year at ${site ? esc(site.name) : '…'}</span><span class="muted">Picks arrival dates that minimise total booked range days, each campaign at ${state.conf}% confidence</span></div>
+    <div class="section-head"><span>Optimise a year</span><span class="muted">Picks arrival dates that minimise total booked range days, each campaign at ${state.conf}% confidence</span></div>
     ${planBlock}
   </div>`;
 }
@@ -530,18 +533,32 @@ function bindSchedule(site) {
   $('expCsv')?.addEventListener('click', () => exportSchedule('csv'));
   $('expJson')?.addEventListener('click', () => exportSchedule('json'));
   if (!site) return;
-  $('optimise').addEventListener('click', () => {
+  $('optimise').addEventListener('click', async () => {
     const e = parseStart($('pE').value), l = parseStart($('pL').value);
     if (!e || !l) { toast('Use dates like 15 Jan'); return; }
-    planUI = { K: Math.max(1, Math.min(6, Math.round(+$('pK').value || 1))), gap: Math.max(1, Math.min(180, Math.round(+$('pGap').value || 60))), earliest: mdKey(...e), latest: mdKey(...l), result: null };
-    const cost = curveOf(site, state).map((c) => c.book);
+    const ranges = [...document.querySelectorAll('[data-range]')].filter((x) => x.checked).map((x) => x.dataset.range);
+    if (!ranges.length) { toast('Allow at least one range'); return; }
+    planUI = { K: Math.max(1, Math.min(6, Math.round(+$('pK').value || 1))), gap: Math.max(1, Math.min(180, Math.round(+$('pGap').value || 60))), earliest: mdKey(...e), latest: mdKey(...l), ranges, result: null };
     const E = C.doyOf(...e), Lt = C.doyOf(...l);
     if (Lt < E) { toast('Latest arrival must be after the earliest'); return; }
-    planUI.result = { cost, opt: C.planYear(cost, planUI.K, planUI.gap, E, Lt), even: C.evenPlan(cost, planUI.K, planUI.gap, E) };
+    $('optimise').disabled = true; $('optimise').textContent = 'Optimising…';
+    let sitesL;
+    try { sitesL = await Promise.all(ranges.map((r) => loadSite(r))); } catch (err) { toast('Could not load range data'); render(); return; }
+    const costs = {};
+    for (const st of sitesL) costs[st.slug] = curveOf(st, state).map((c) => c.book);
+    const medians = {};
+    for (const st of sitesL) medians[st.slug] = curveOf(st, state).map((c) => c.median);
+    const base = ranges.includes(state.site) ? state.site : ranges[0];
+    if (!costs[base]) costs[base] = curveOf(site, state).map((c) => c.book);
+    planUI.result = { costs, medians, base, multi: ranges.length > 1, opt: C.planYearMulti(costs, planUI.K, planUI.gap, E, Lt), even: C.evenPlan(costs[base], planUI.K, planUI.gap, E) };
     if (!planUI.result.opt.days.length) toast('No feasible plan: widen the dates or shorten the gap');
     render();
   });
-  $('applyPlan')?.addEventListener('click', () => { if (addToSchedule(site, planUI.result.opt.days)) render(); });
+  $('applyPlan')?.addEventListener('click', () => {
+    const pr = planUI.result;
+    const picks = pr.opt.days.map((doy, i) => ({ doy, slug: pr.opt.ranges[i], book: pr.costs[pr.opt.ranges[i]][doy - 1], median: pr.medians[pr.opt.ranges[i]][doy - 1] }));
+    if (addToSchedule(site, picks)) render();
+  });
 }
 function scheduleRows() {
   return schedule.map((x) => { const [m, d] = parseStart(x.start); return { range: META.sites.find((s) => s.slug === x.site)?.name || x.site, arrive: fmtDate(x.year, m, d), booking_ends: fmtDate(x.year, m, d, x.book - 1), days: x.book, median_days: x.median, flights: x.flights, confidence: x.conf, status: x.status }; });

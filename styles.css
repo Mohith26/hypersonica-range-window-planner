@@ -157,8 +157,11 @@ tr.click:hover td { background: rgba(255,255,255,.035); }
 tr.sel td { background: rgba(51,65,194,.18); }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; padding-right: 16px; }
 .tag { display: inline-block; padding: 1px 8px; border-radius: var(--btn-border-radius); border: 1px solid var(--line); font-size: 12px; font-weight: var(--font-weight-medium); }
+button.tag { background: transparent; color: var(--color-white); line-height: 1.5; }
 .tag.blue { background: var(--color-blue); border-color: var(--color-blue); }
-.tag.white { background: var(--color-white); color: var(--color-black); border-color: var(--color-white); }
+.tag.white, button.tag.white { background: var(--color-white); color: var(--color-black); border-color: var(--color-white); }
+button.tag.blue { background: var(--color-blue); }
+.plan td { white-space: nowrap; }
 
 /* day strips (replays) */
 .strip { display: flex; gap: 2px; }

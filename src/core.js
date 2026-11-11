@@ -342,6 +342,19 @@ export function planYear(cost, K, minGap, earliest = 1, latest = 365) {
   return { days, total };
 }
 
+/**
+ * Multi-range year plan: each campaign may go to any allowed range. costs: { slug: cost[365] }.
+ * Because the gap constraint is on arrival dates only, the optimum uses, for each day, the cheapest
+ * range that day; the DP then runs on that lower envelope (exact). Returns { days, ranges, total }.
+ */
+export function planYearMulti(costs, K, minGap, earliest = 1, latest = 365) {
+  const slugs = Object.keys(costs);
+  const env = new Array(365).fill(Infinity), arg = new Array(365).fill(null);
+  for (let i = 0; i < 365; i++) for (const s of slugs) if (costs[s][i] < env[i]) { env[i] = costs[s][i]; arg[i] = s; }
+  const p = planYear(env, K, minGap, earliest, latest);
+  return { days: p.days, ranges: p.days.map((d) => arg[d - 1]), total: p.total, envelope: env };
+}
+
 /** Baseline: K campaigns evenly spaced from `earliest`, one every `minGap` days. */
 export function evenPlan(cost, K, minGap, earliest = 1) {
   const days = [];
