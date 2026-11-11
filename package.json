@@ -1,0 +1,1 @@
+{"type":"module","private":true,"scripts":{"test":"node --test tests/core.test.mjs","data":"bash scripts/fetch_data.sh raw && python3 scripts/build_data.py raw data && node scripts/precompute.mjs"}}
