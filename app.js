@@ -184,9 +184,9 @@ async function render() {
   const sm = META.sites.find((x) => x.slug === state.site);
   const [m, d] = parseStart(state.start);
   $('meta').textContent = sm.name + ' · arrive ' + fmtMD(m, d) + ' · ' + state.flights + (state.flights === 1 ? ' flight' : ' flights') + ' · ' + state.conf + '% confidence';
-  const subs = { planner: 'Range window planner: how long to book, and when, so the campaign flies.', replay: 'Replay every past year of this window, day by day and hour by hour.',
-    ranges: 'Compare ranges month by month under the same campaign and criteria.', schedule: 'Your requested range windows, and the year plan that books the fewest days.',
-    method: 'How the booking length is computed and how well it held up.' };
+  const subs = { planner: 'How long to book, and when, so the campaign flies.', replay: 'Every past year of this window, day by day.',
+    ranges: 'Five ranges, month by month, same campaign.', schedule: 'Range windows, and the year plan that books fewest days.',
+    method: 'How the booking is computed, and how it held up.' };
   $('sub').textContent = subs[state.tab];
   document.title = ({ planner: 'Planner', replay: 'Replay', ranges: 'Ranges', schedule: 'Schedule', method: 'Method' })[state.tab] + ' · Campaigns · Hypersonica (concept)';
   const view = $('view');
@@ -262,6 +262,7 @@ function plannerView(site) {
   return `
   <div class="section">
     <div class="section-head"><span>Booking length · arrive ${fmtMD(m, d)}</span><span class="muted">${P.reps.length} replays from ${new Set(P.reps.map((r) => r.year)).size} years · ±${JITTER} days around the arrival date</span></div>
+    <p class="lede">${c.book === Infinity ? `Arriving ${fmtMD(m, d)}, ${esc(site.name)} <b>never reliably finishes</b> ${s.flights} flights within 120 days under these criteria.` : `Book <b>${c.book} days</b> at ${esc(site.name)} to fly ${s.flights === 1 ? 'one vehicle' : s.flights === 2 ? 'both vehicles' : 'all ' + s.flights + ' vehicles'} from ${fmtMD(m, d)}: <b>${c.book - minNominal} ${c.book - minNominal === 1 ? 'day' : 'days'}</b> of weather margin on the ${minNominal}-day plan.${best.book < c.book ? ` Arriving ${fmtMD(best.m, best.d)} would need ${best.book}.` : ' This is the shortest booking of the year.'}`}</p>
     <div class="kpis">
       <div class="kpi"><div class="label">Book</div><div class="value">${bookTxt}<small>days</small></div><div class="note">to fly ${s.flights} of ${s.flights}, at least ${s.conf}% for a new year (conformal, 15 years). Nominal without weather: ${minNominal} days.</div></div>
       <div class="kpi"><div class="label">Median finish</div><div class="value">${fmtDays(c.median)}<small>days</small></div><div class="note">Half of past years were done by then. Best arrival this year: ${fmtMD(best.m, best.d)} (${fmtDays(best.book)} days).</div></div>

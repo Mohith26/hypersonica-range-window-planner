@@ -41,6 +41,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--color-bg); color: var(--color-text); }
 body {
+  letter-spacing: -0.005em;
   font-family: var(--font-family-body);
   font-size: var(--font-size-base);
   line-height: var(--line-height-base);
@@ -55,11 +56,12 @@ button, input, select { font: inherit; color: inherit; }
 
 /* ---------- header (mirrors site header: logo left, nav right, 14px/500) ---------- */
 .header {
-  position: sticky; top: 0; z-index: 20; height: 84px;
+  position: sticky; top: 0; z-index: 20; height: 78px;
   display: flex; align-items: flex-start; justify-content: space-between;
   padding: 12px var(--sizes-page-padding) 0;
   background: var(--color-bg);
 }
+.header::after { content: ""; position: absolute; left: var(--col-left); top: 0; bottom: 0; border-left: 1px solid var(--line); }
 .logo { display: block; width: var(--logo-width); color: var(--color-white); margin-top: 0; }
 .logo svg { display: block; width: 100%; height: auto; }
 .nav { display: flex; gap: 16px; align-items: center; margin-top: 25px; font-weight: var(--font-weight-medium); }
@@ -71,11 +73,11 @@ button, input, select { font: inherit; color: inherit; }
 .nav .tz svg { width: 13px; height: 13px; }
 
 /* ---------- page grid: left column under logo, vertical rule at the site's x position ---------- */
-.page { display: grid; grid-template-columns: var(--col-left) 1fr; min-height: calc(100vh - 84px); }
+.page { display: grid; grid-template-columns: var(--col-left) 1fr; min-height: calc(100vh - 78px); }
 .side { padding: 6px var(--sizes-page-padding) 40px; }
 .main { border-left: 1px solid var(--line); padding: 0 var(--sizes-page-padding) 40px 16px; min-width: 0; }
-.page-title { font-size: var(--font-size-h2); line-height: 1.2; margin: 0 0 8px; font-weight: var(--font-weight-regular); padding-top: 4px; }
-.page-sub { font-size: var(--font-size-h2); line-height: 1.2; margin: 0; font-weight: var(--font-weight-regular); max-width: 620px; }
+.page-title { font-size: var(--font-size-h2); line-height: 1.2; margin: 0 0 14px; font-weight: var(--font-weight-regular); letter-spacing: -0.015em; }
+.page-sub { font-size: var(--font-size-h2); line-height: 1.2; margin: 0; font-weight: var(--font-weight-regular); max-width: 330px; letter-spacing: -0.015em; }
 .page-meta { margin-top: 10px; font-weight: var(--font-weight-medium); opacity: var(--secondary-text-opacity); }
 
 /* sub-navigation tabs, same treatment as the site nav (underline = current) */
@@ -128,7 +130,7 @@ button, input, select { font: inherit; color: inherit; }
 .kpi { padding: 16px 16px 18px 0; }
 .kpi + .kpi { padding-left: 16px; border-left: 1px solid var(--line-soft); }
 .kpi .label { font-weight: var(--font-weight-medium); }
-.kpi .value { font-size: var(--font-size-display); line-height: 1.1; font-weight: var(--font-weight-regular); letter-spacing: -0.01em; margin-top: 6px; white-space: nowrap; }
+.kpi .value { font-size: var(--font-size-display); line-height: 1.1; font-weight: var(--font-weight-regular); letter-spacing: -0.025em; margin-top: 6px; white-space: nowrap; }
 .kpi .value small { font-size: 20px; margin-left: 4px; }
 .kpi .note { margin-top: 4px; opacity: var(--secondary-text-opacity); font-size: 12px; line-height: 1.4; }
 .kpi .inline { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
@@ -225,3 +227,8 @@ kbd { font-family: inherit; border: 1px solid var(--line); border-radius: 3px; p
   .kpi .value { font-size: 40px; }
   .two { grid-template-columns: 1fr 320px; }
 }
+
+/* large secondary statement under a section rule (site pattern: "Our approach enables ...") */
+.lede { font-size: var(--font-size-h2); line-height: 1.2; letter-spacing: -0.015em; color: var(--color-gray300); margin: 16px 0 6px; max-width: 860px; }
+.lede b { color: var(--color-white); font-weight: var(--font-weight-regular); }
+.hours td:last-child { white-space: nowrap; }
